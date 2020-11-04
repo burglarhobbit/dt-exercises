@@ -3,7 +3,7 @@ import numpy as np
 import rospy
 
 from duckietown.dtros import DTROS, NodeType, TopicType, DTParam, ParamType
-from duckietown_msgs.msg import Twist2DStamped, LanePose, WheelsCmdStamped, BoolStamped, FSMState, StopLineReading
+from duckietown_msgs.msg import Twist2DStamped, LanePose, WheelsCmdStamped, BoolStamped, FSMState, StopLineReading, SegmentList
 
 from lane_controller.controller import PurePursuitLaneController
 
@@ -30,8 +30,19 @@ class LaneControllerNode(DTROS):
             node_type=NodeType.CONTROL
         )
 
+        self.omega_prev = 0
+
         # Add the node parameters to the parameters dictionary
         self.params = dict()
+
+        # lookahead distance
+        self.params['~lookahead_dist'] = DTParam(
+            '~lookahead_dist',
+            param_type=ParamType.FLOAT,
+            min_value=0.0,
+            max_value=10.0
+        )
+
         self.pp_controller = PurePursuitLaneController(self.params)
 
         # Construct publishers
@@ -46,6 +57,16 @@ class LaneControllerNode(DTROS):
                                                  self.cbLanePoses,
                                                  queue_size=1)
 
+        # self.sub_segment_list = rospy.Subscriber("/agent/line_detector_node/segment_list",
+        #                            SegmentList,
+        #                            self.cbSegmentLists,
+        #                            queue_size=1)
+
+        self.sub_filtered_segment_list = rospy.Subscriber("/agent/lane_filter_node/seglist_filtered",
+                                   SegmentList,
+                                   self.cbFilteredSegmentLists,
+                                   queue_size=1)
+
         self.log("Initialized!")
 
     def cbLanePoses(self, input_pose_msg):
@@ -55,6 +76,7 @@ class LaneControllerNode(DTROS):
             input_pose_msg (:obj:`LanePose`): Message containing information about the current lane pose.
         """
         self.pose_msg = input_pose_msg
+        # print("self.pose_msg:", self.pose_msg)
 
         car_control_msg = Twist2DStamped()
         car_control_msg.header = self.pose_msg.header
@@ -65,6 +87,66 @@ class LaneControllerNode(DTROS):
 
         self.publishCmd(car_control_msg)
 
+    def cbSegmentLists(self, input_seg_msg):
+        """Callback receiving a list of the detected segments
+        https://github.com/duckietown/dt-core/blob/daffy/packages/line_detector/src/line_detector_node.py
+        
+        Args:
+            input_seg_msg (:obj:`SegmentList`): Message containing information about the detected segments
+        """
+
+        # self.seg_msg = input_seg_msg
+        # # print("self.seg_msg:", self.seg_msg)
+
+        # car_control_msg = Twist2DStamped()
+        # car_control_msg.header = self.pose_msg.header
+
+        # follow_point = self.pp_controller.process_segments(self.seg_msg)
+
+        # if follow_point != (0,0):
+        #     v,w = self.pp_controller.pure_pursuit(follow_point)
+        #     self.log("Omega: %.2f"%w)
+        #     car_control_msg.v = 0.5
+        #     car_control_msg.omega = w
+        # else:
+        #     # TODO This needs to get changed
+        #     car_control_msg.v = 0.5
+        #     car_control_msg.omega = 0
+
+        # self.publishCmd(car_control_msg)
+        pass
+
+    def cbFilteredSegmentLists(self, input_seg_msg):
+        """Callback receiving a list of the detected segments
+        https://github.com/duckietown/dt-core/blob/daffy/packages/line_detector/src/line_detector_node.py
+        
+        Args:
+            input_seg_msg (:obj:`SegmentList`): Message containing information about the detected segments
+        """
+        self.seg_msg = input_seg_msg
+        # print("self.seg_msg:", self.seg_msg)
+
+        car_control_msg = Twist2DStamped()
+        car_control_msg.header = self.pose_msg.header
+
+        follow_point, use_prev_omega = self.pp_controller.process_segments(self.seg_msg)
+        print("Follow point:", follow_point)
+        if follow_point != (0,0):
+            v,w = self.pp_controller.pure_pursuit(follow_point)
+            self.log("Omega: %.2f"%w)
+            car_control_msg.v = 0.3
+            car_control_msg.omega = w
+            print("Setting omega value to:",w)
+            self.omega_prev = w
+        else:
+            # TODO This needs to get changed
+            car_control_msg.v = 0.3
+            if use_prev_omega:
+                car_control_msg.omega = self.omega_prev
+            else:
+                car_control_msg.omega = 0
+
+        self.publishCmd(car_control_msg)
 
     def publishCmd(self, car_cmd_msg):
         """Publishes a car command message.
