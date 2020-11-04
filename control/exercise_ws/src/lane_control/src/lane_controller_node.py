@@ -30,7 +30,10 @@ class LaneControllerNode(DTROS):
             node_type=NodeType.CONTROL
         )
 
-        self.omega_prev = 0
+        self.omega_repeat_count = 0
+        self.v = 0.4
+        self.v_prev = 0.4
+        self.omega_prev = 0.0
 
         # Add the node parameters to the parameters dictionary
         self.params = dict()
@@ -82,38 +85,12 @@ class LaneControllerNode(DTROS):
         car_control_msg.header = self.pose_msg.header
 
         # TODO This needs to get changed
-        car_control_msg.v = 0.5
+        car_control_msg.v = self.v
         car_control_msg.omega = 0
 
         self.publishCmd(car_control_msg)
 
     def cbSegmentLists(self, input_seg_msg):
-        """Callback receiving a list of the detected segments
-        https://github.com/duckietown/dt-core/blob/daffy/packages/line_detector/src/line_detector_node.py
-        
-        Args:
-            input_seg_msg (:obj:`SegmentList`): Message containing information about the detected segments
-        """
-
-        # self.seg_msg = input_seg_msg
-        # # print("self.seg_msg:", self.seg_msg)
-
-        # car_control_msg = Twist2DStamped()
-        # car_control_msg.header = self.pose_msg.header
-
-        # follow_point = self.pp_controller.process_segments(self.seg_msg)
-
-        # if follow_point != (0,0):
-        #     v,w = self.pp_controller.pure_pursuit(follow_point)
-        #     self.log("Omega: %.2f"%w)
-        #     car_control_msg.v = 0.5
-        #     car_control_msg.omega = w
-        # else:
-        #     # TODO This needs to get changed
-        #     car_control_msg.v = 0.5
-        #     car_control_msg.omega = 0
-
-        # self.publishCmd(car_control_msg)
         pass
 
     def cbFilteredSegmentLists(self, input_seg_msg):
@@ -125,22 +102,34 @@ class LaneControllerNode(DTROS):
         """
         self.seg_msg = input_seg_msg
         # print("self.seg_msg:", self.seg_msg)
-
+    
         car_control_msg = Twist2DStamped()
         car_control_msg.header = self.pose_msg.header
+
+        if self.omega_repeat_count:
+            self.omega_repeat_count -= 1
+            car_control_msg.v = self.v_prev
+            car_control_msg.omega = self.omega_prev
+            print("Setting v, omega value to:", self.v_prev, self.omega_prev)
+            self.publishCmd(car_control_msg)
+            return
 
         follow_point, use_prev_omega = self.pp_controller.process_segments(self.seg_msg)
         print("Follow point:", follow_point)
         if follow_point != (0,0):
-            v,w = self.pp_controller.pure_pursuit(follow_point)
+            v, w = self.pp_controller.pure_pursuit(follow_point, self.v)
             self.log("Omega: %.2f"%w)
-            car_control_msg.v = 0.3
+
+            car_control_msg.v = v
             car_control_msg.omega = w
-            print("Setting omega value to:",w)
+            print("Setting v, omega value to: (%0.2f, %.2f)" % (self.v, self.omega_prev))
             self.omega_prev = w
+            self.v_prev = v
+            if np.abs(w) > 1:
+                self.omega_repeat_count = 8
         else:
             # TODO This needs to get changed
-            car_control_msg.v = 0.3
+            car_control_msg.v = self.v
             if use_prev_omega:
                 car_control_msg.omega = self.omega_prev
             else:
@@ -149,7 +138,7 @@ class LaneControllerNode(DTROS):
         self.publishCmd(car_control_msg)
 
     def publishCmd(self, car_cmd_msg):
-        """Publishes a car command message.
+        """Publishes a car commsand message.
 
         Args:
             car_cmd_msg (:obj:`Twist2DStamped`): Message containing the requested control action.

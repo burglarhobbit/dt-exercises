@@ -1,5 +1,5 @@
 import numpy as np
-
+import traceback
 
 class PurePursuitLaneController:
     """
@@ -41,7 +41,9 @@ class PurePursuitLaneController:
         yellow_pts = []
         white_dist = []
         yellow_dist = []
-
+        
+        yellow_tangents = []
+        white_tangents = []
         # print("self.parameters:", self.parameters["~lookahead_dist"].value)
         for seg in segment_msg_list.segments:
             
@@ -56,15 +58,20 @@ class PurePursuitLaneController:
             mid_x = (x1+x2)/2
             mid_y = (y1+y2)/2
 
+            tangent = -(x2-x1)/(y2-y1) # -ve because flipped co-ord system
+
             d = self.compute_d(mid_x,mid_y)
             diff = self.parameters["~lookahead_dist"].value - d
 
             if seg.color == seg.YELLOW:
                 yellow_pts.append([mid_x, mid_y])
-                yellow_dist.append(diff)
+                yellow_dist.append(d)
+                yellow_tangents.append(tangent)
             elif seg.color == seg.WHITE:
                 white_pts.append([mid_x, mid_y])
-                white_dist.append(diff)
+                white_dist.append(d)
+                white_tangents.append(tangent)
+
 
 
             # d1 = self.compute_d(x1,y1)
@@ -75,8 +82,14 @@ class PurePursuitLaneController:
             #     x,y = x1,y1
             # if diff2 > 0 and diff2 < min_d:
             #     x,y = x2,y2
-        print("Yellow points:",yellow_pts)
-        print("White points:",white_pts)
+        print("Yellow points:")
+        for i in zip(yellow_pts,yellow_dist,yellow_tangents):
+            print(i)
+        print("White points:")
+        for i in zip(white_pts,white_dist,white_tangents):
+            print(i)
+
+        # return (0,0), False
         point_scalar = 0.5
 
         yellow_pts_stat, white_pts_stat = False, False
@@ -84,40 +97,43 @@ class PurePursuitLaneController:
             yellow_pts_stat = True
             yellow_pts = np.array(yellow_pts)
             yellow_dist = np.array(yellow_dist)
+            yellow_tangents = np.array(yellow_tangents)
         if len(white_pts):
             white_pts_stat = True
             white_pts = np.array(white_pts)
             white_dist = np.array(white_dist)
+            white_tangents = np.array(white_tangents)
 
+        tangent = 1
         if yellow_pts_stat:
             
             y_filter_pts_idx = (np.absolute(yellow_pts) < 0.5).all(axis=1) # logical and of dim-1
-            yellow_pts_filtered = yellow_pts[y_filter_pts_idx]
-            yellow_dist_filtered = yellow_dist[y_filter_pts_idx]
-            
-            # print("here0")
-            # yellow_mean = np.mean(yellow_pts_filtered, axis=0)
-            # numerator = np.prod(yellow_dist_filtered - yellow_mean, axis=1).sum()
-            # print("here1")
-            # denom = np.square(yellow_dist_filtered[:,1] - yellow_mean[1]).sum()
-            # print("here2")
-            # m = numerator/denom
-            
-            # print("m:",m)
-            # # turn right
-            # if m < 1.61 and m > 0:
-            #     follow_point_idx = np.argmin(yellow_pts_filtered, axis = 0)[1]
-            #     follow_point = yellow_pts_filtered[follow_point_idx]
-            #     break
-            # # turn left
-            # elif m > -1.61 and m < 0:
-            #     follow_point_idx = np.argmax(yellow_pts_filtered, axis = 0)[1]
-            #     follow_point = yellow_pts_filtered[follow_point_idx]
-            #     break
-
             yellow_median_idx = np.argsort(yellow_dist)[len(yellow_dist)//2]
             yellow_median = yellow_pts[yellow_median_idx]
 
+            if y_filter_pts_idx.size:
+                yellow_pts_filtered = yellow_pts[y_filter_pts_idx]
+                yellow_dist_filtered = yellow_dist[y_filter_pts_idx]
+                
+                m = np.mean(yellow_tangents)
+                pts = yellow_pts
+                try:
+                    # turn right
+                    if m < tangent and m > 0:
+                        follow_point_idx = np.argmin(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] -= 0.1 # between the lane
+                        follow_point[1] -= 0.1 # a bit towards the right
+                        return tuple(follow_point), False
+                    # turn left
+                    elif m > -tangent and m < 0:
+                        follow_point_idx = np.argmax(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] += 0.1
+                        return tuple(follow_point), False
+                except Exception as e:
+                    print(traceback.format_exc())
+                        
             """ 3 cases:
                 1. if left/right white points are there: x = (x1+x2)*3/4
                 2. if left white point + yellow points are there: x = (x1+x2)*3/2
@@ -125,7 +141,7 @@ class PurePursuitLaneController:
             """
 
             if white_pts_stat:
-
+                # filtering points on the right of yellow lane
                 w_filter_pts_idx = white_pts[:, 1] < yellow_median[1] 
                 white_pts_filtered = white_pts[w_filter_pts_idx] 
                 
@@ -152,12 +168,40 @@ class PurePursuitLaneController:
             if len(yellow_pts):
                 pass
             else:
+                #usually removes the left lane white lines
                 w_filter_pts_idx = (np.absolute(white_pts) < 0.5).all(axis=1) # logical and of dim-1
                 white_pts_filtered = white_pts[w_filter_pts_idx] 
                 white_dist_filtered = white_dist[w_filter_pts_idx]
+                white_tangents_filtered = white_tangents[w_filter_pts_idx]
 
-                white_median_idx = np.argsort(white_dist)[len(white_dist)//2]
-                white_median = white_pts[white_median_idx]
+                m = np.mean(white_tangents_filtered)
+                pts = white_pts_filtered
+
+                white_median_idx = np.argsort(white_dist_filtered)[len(white_dist_filtered)//2]
+                white_median = white_pts_filtered[white_median_idx]
+
+                try:
+                    # turn right
+                    if m < tangent and m > 0:
+                        follow_point_idx = np.argmin(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] += 0.1 # between the lane
+                        follow_point[1] -= 0.1 # a bit towards the right
+                        return tuple(follow_point), False
+                    # turn left
+                    elif m > -tangent and m < 0:
+                        follow_point_idx = np.argmax(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] -= 0.1 #between the lane
+                        return tuple(follow_point), False
+                except Exception as e:
+                    print(traceback.format_exc())
+
+                # stay on the lane
+
+                follow_point = (white_median[0], white_median[1] + 0.12)
+
+                return follow_point, False
 
                 # turn right
                 if white_median[1] < -0.15:
@@ -184,7 +228,7 @@ class PurePursuitLaneController:
         
         return (x, y), use_prev_omega
 
-    def pure_pursuit(self, follow_point, K=1.0):
+    def pure_pursuit(self, follow_point, v, K=1.0):
         """
         Input:
             - follow_point: numpy array of follow point [x,y] in robot frame
@@ -198,12 +242,14 @@ class PurePursuitLaneController:
         d = np.sqrt(follow_point[0] ** 2 + follow_point[1] ** 2)
         
         # TODO: compute sin(alpha)
-        sin_alpha = follow_point[1] / d
+        sin_alpha = 2 * follow_point[1] / d
         
-        v = 0.1 # we can make it constant or we can make it as a function of sin_alpha
+        v = v # we can make it constant or we can make it as a function of sin_alpha
         
         # TODO: compute angular velocity
         w = sin_alpha / K
+
+        if np.abs(w) > 1:
+            v = 0.1
         
         return v, w
-
