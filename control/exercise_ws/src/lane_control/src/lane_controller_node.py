@@ -7,6 +7,7 @@ from duckietown_msgs.msg import Twist2DStamped, LanePose, WheelsCmdStamped, Bool
 
 from lane_controller.controller import PurePursuitLaneController
 
+import traceback
 
 class LaneControllerNode(DTROS):
     """Computes control action.
@@ -31,8 +32,8 @@ class LaneControllerNode(DTROS):
         )
 
         self.omega_repeat_count = 0
-        self.v = 0.4
-        self.v_prev = 0.4
+        self.v = 0.3
+        self.v_prev = self.v
         self.omega_prev = 0.0
 
         # Add the node parameters to the parameters dictionary
@@ -111,11 +112,17 @@ class LaneControllerNode(DTROS):
             car_control_msg.v = self.v_prev
             car_control_msg.omega = self.omega_prev
             print("Setting v, omega value to:", self.v_prev, self.omega_prev)
-            self.publishCmd(car_control_msg)
+            # self.omega_repeat_count < 4:
+            #     self.v_prev = 0.2
+            self.publishCmd(car_control_msg)            
             return
-
-        follow_point, use_prev_omega = self.pp_controller.process_segments(self.seg_msg)
-        print("Follow point:", follow_point)
+        try:
+            follow_point, use_prev_omega = self.pp_controller.process_segments(self.seg_msg)
+            print("Follow point:", follow_point)
+        except Exception as e:
+            print(traceback.format_exc())
+                
+        
         if follow_point != (0,0):
             v, w = self.pp_controller.pure_pursuit(follow_point, self.v)
             self.log("Omega: %.2f"%w)
@@ -126,7 +133,7 @@ class LaneControllerNode(DTROS):
             self.omega_prev = w
             self.v_prev = v
             if np.abs(w) > 1:
-                self.omega_repeat_count = 8
+                self.omega_repeat_count = 10
         else:
             # TODO This needs to get changed
             car_control_msg.v = self.v
