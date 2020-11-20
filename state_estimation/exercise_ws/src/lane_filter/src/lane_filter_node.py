@@ -52,6 +52,8 @@ class LaneFilterNode(DTROS):
         # Create the filter
         self.filter = LaneFilterHistogramKF(**self._filter)
         self.t_last_update = rospy.get_time()
+        self.last_update_stamp = self.t_last_update
+
         self.filter.wheel_radius = rospy.get_param(f"/{veh}/kinematics_node/radius")
 
         # Subscribers
@@ -100,7 +102,7 @@ class LaneFilterNode(DTROS):
         if not self.filter.initialized:
             self.filter.encoder_resolution = left_encoder_msg.resolution
             self.filter.initialized = True
-        self.left_encoder_ticks_delta = left_encoder_msg.data - self.right_encoder_ticks
+        self.left_encoder_ticks_delta = left_encoder_msg.data - self.left_encoder_ticks
 
     def cbProcessRightEncoder(self, right_encoder_msg):
         if not self.filter.initialized:
@@ -133,6 +135,9 @@ class LaneFilterNode(DTROS):
             segment_list_msg (:obj:`SegmentList`): message containing list of processed segments
 
         """
+
+        self.last_update_stamp = segment_list_msg.header.stamp
+
         # Get actual timestamp for latency measurement
         timestamp_before_processing = rospy.Time.now()
 
@@ -148,7 +153,7 @@ class LaneFilterNode(DTROS):
 
         # build lane pose message to send
         lanePose = LanePose()
-        lanePose.header.stamp = segment_list_msg.header.stamp
+        lanePose.header.stamp = self.last_update_stamp
         lanePose.d = belief['mean'][0]
         lanePose.phi = belief['mean'][1]
         lanePose.d_phi_covariance = [belief['covariance'][0][0],
@@ -185,10 +190,11 @@ class LaneFilterNode(DTROS):
 
             # Create belief image and publish it
             ml = self.filter.generate_measurement_likelihood(segment_list_msg.segments)
-            ml_img = self.bridge.cv2_to_imgmsg(
-                np.array(255 * ml).astype("uint8"), "mono8")
-            ml_img.header.stamp = segment_list_msg.header.stamp
-            self.pub_ml_img.publish(ml_img)
+            if ml is not None:
+                ml_img = self.bridge.cv2_to_imgmsg(
+                    np.array(255 * ml).astype("uint8"), "mono8")
+                ml_img.header.stamp = segment_list_msg.header.stamp
+                self.pub_ml_img.publish(ml_img)
 
 
     def cbMode(self, msg):
