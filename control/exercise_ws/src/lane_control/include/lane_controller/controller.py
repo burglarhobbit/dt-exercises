@@ -93,8 +93,8 @@ class PurePursuitLaneController:
                 3. if right white point + yellow points are there: x = (x1+x2)/2
         """
         # return (0,0), False
-        point_scalar = 0.5
-        displacement_val = 0.1
+        displacement_val = 0.1 # follow point for turn
+        boundary_range = 0.5 # range to lookinto in robot frame
 
         yellow_pts_stat, white_pts_stat = False, False
         if len(yellow_pts):
@@ -111,30 +111,33 @@ class PurePursuitLaneController:
         tangent = np.tan(np.deg2rad(45))
         tangent_60 = np.tan(np.deg2rad(60))
         
+        # if ywellow points exist
         if yellow_pts_stat:
             print("In Yellow")
-            y_filter_pts_idx = (np.absolute(yellow_pts) < 0.5).all(axis=1) # logical and of dim-1
-            yellow_median_idx = np.argsort(yellow_dist)[len(yellow_dist)//2]
-            yellow_median = yellow_pts[yellow_median_idx]
-
+            # get yellow points within boundary
+            y_filter_pts_idx = (np.absolute(yellow_pts) < boundary_range).all(axis=1) # logical and of dim-1
+            
             if np.any(y_filter_pts_idx) > 1:
+                yellow_median_idx = np.argsort(yellow_dist)[len(yellow_dist)//2]
+                yellow_median = yellow_pts[yellow_median_idx]
+
                 yellow_pts_filtered = yellow_pts[y_filter_pts_idx]
                 yellow_dist_filtered = yellow_dist[y_filter_pts_idx]
                 
                 m = np.sort(yellow_tangents)[len(yellow_tangents)//2] # np.mean(yellow_tangents)
-                pts = yellow_pts
+                pts = yellow_pts_filtered
 
                 # turn right
                 if m < tangent and m > 0:
                     follow_point_idx = np.argmin(pts, axis = 0)[1]
                     follow_point = pts[follow_point_idx]
-                    follow_point[0] -= 0.1 # between the lane
-                    follow_point[1] -= 0.1 # a bit towards the right
+                    follow_point[0] -= displacement_val # between the lane
+                    follow_point[1] -= displacement_val # a bit towards the right
                 # turn left
                 elif m > -tangent and m < 0:
                     follow_point_idx = np.argmax(pts, axis = 0)[1]
                     follow_point = pts[follow_point_idx]
-                    follow_point[0] += 0.1
+                    follow_point[0] += displacement_val
                 elif white_pts_stat:
                     # filtering points on the right of yellow lane
                     print("elif white_pts_stat")
@@ -161,19 +164,6 @@ class PurePursuitLaneController:
                         follow_point = (0,0)
                         return tuple(follow_point), False
 
-            else:
-                # turn right
-                if yellow_median[1] < 0.1:
-                    follow_point = (yellow_median[0], yellow_median[1] - displacement_val)  
-
-                # turn left
-                elif yellow_median[1] > 0.2:
-                    follow_point = (yellow_median[0], yellow_median[1] + displacement_val)
-
-                # do nothing
-                else:
-                    follow_point = (0,0)
-        
         # turn dynamic
         elif white_pts_stat:
             print("In White")
@@ -182,49 +172,52 @@ class PurePursuitLaneController:
             else:
                 #usually removes the left lane white lines
                 w_filter_pts_idx = (np.absolute(white_pts) < 0.5).all(axis=1) # logical and of dim-1
-                white_pts_filtered = white_pts[w_filter_pts_idx] 
-                white_dist_filtered = white_dist[w_filter_pts_idx]
-                white_tangents_filtered = white_tangents[w_filter_pts_idx]
+                if np.any(w_filter_pts_idx):
+                    white_pts_filtered = white_pts[w_filter_pts_idx] 
+                    white_dist_filtered = white_dist[w_filter_pts_idx]
+                    white_tangents_filtered = white_tangents[w_filter_pts_idx]
 
-                m = np.sort(white_tangents_filtered)[len(white_tangents_filtered)//2] # np.mean(white_tangents_filtered)
-                pts = white_pts_filtered
+                    m = np.sort(white_tangents_filtered)[len(white_tangents_filtered)//2] # np.mean(white_tangents_filtered)
+                    pts = white_pts_filtered
 
-                white_median_idx = np.argsort(white_dist_filtered)[len(white_dist_filtered)//2]
-                white_median = white_pts_filtered[white_median_idx]
+                    white_median_idx = np.argsort(white_dist_filtered)[len(white_dist_filtered)//2]
+                    white_median = white_pts_filtered[white_median_idx]
 
-                # turn hard right
-                if m < tangent and m > 0:
-                    follow_point_idx = np.argmin(pts, axis = 0)[1]
-                    follow_point = pts[follow_point_idx]
-                    follow_point[0] += 0.1 # between the lane
-                    follow_point[1] -= 0.1 # a bit towards the right
+                    # turn hard right
+                    if m < tangent and m > 0:
+                        follow_point_idx = np.argmin(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] += 0.1 # between the lane
+                        follow_point[1] -= 0.1 # a bit towards the right
 
-                # turn hard left
-                elif m > -tangent and m < 0:
-                    follow_point_idx = np.argmax(pts, axis = 0)[1]
-                    follow_point = pts[follow_point_idx]
-                    follow_point[0] -= 0.1 #between the lane
-                # move right
-                elif m > tangent and m < tangent_60:
-                    follow_point = (white_median[0], white_median[1] + displacement_val)
-                # move left
-                elif m < -tangent and m > -tangent_60:
-                    follow_point = (white_median[0], white_median[1] + displacement_val)
+                    # turn hard left
+                    elif m > -tangent and m < 0:
+                        follow_point_idx = np.argmax(pts, axis = 0)[1]
+                        follow_point = pts[follow_point_idx]
+                        follow_point[0] -= 0.1 #between the lane
+                    # move right
+                    elif m > tangent and m < tangent_60:
+                        follow_point = (white_median[0], white_median[1] + displacement_val)
+                    # move left
+                    elif m < -tangent and m > -tangent_60:
+                        follow_point = (white_median[0], white_median[1] + displacement_val)
+                    else:
+                        follow_point = (0,0)
                 else:
                     follow_point = (0,0)
                 return tuple(follow_point), False
 
-                # turn right
-                if white_median[1] < -0.15:
-                    follow_point = (white_median[0], white_median[1] - 0.1)  
+                # # turn right
+                # if white_median[1] < -0.15:
+                #     follow_point = (white_median[0], white_median[1] - 0.1)  
 
-                # turn left
-                elif white_median[1] > -0.1:
-                    follow_point = (white_median[0], white_median[1] + 0.1)
+                # # turn left
+                # elif white_median[1] > -0.1:
+                #     follow_point = (white_median[0], white_median[1] + 0.1)
 
-                # do nothing
-                else:
-                    follow_point = (0,0)
+                # # do nothing
+                # else:
+                #     follow_point = (0,0)
 
         # do nothing
         else:
