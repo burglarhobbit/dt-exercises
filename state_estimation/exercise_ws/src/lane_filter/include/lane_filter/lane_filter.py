@@ -57,29 +57,31 @@ class LaneFilterHistogramKF():
         self.cov_0 = np.array([[self.sigma_d_0, 0], [0, self.sigma_phi_0]])
         self.belief = {'mean': self.mean_0, 'covariance': self.cov_0}
 
-        # distance of bot from middle lane / LanePose
-        self.d_t = self.mean_d_0
-        self.phi = self.mean_phi_0
-        self.vt = 0
+        # uncertainty cov process
+        d_std_Q = 0.05
+        phi_std_Q = np.pi/30 # 10 degree
+        # cov measurement
+        d_std_R = 0.05
+        phi_std_R = np.pi/30 # 10 degree
 
-        # uncertainty cov
-        self.Q = np.diag([0.01]*2)
-        self.R = np.diag([0.01]*2)
+        self.Q = np.diag([d_std_Q**2, phi_std_Q**2])
+        self.R = np.diag([d_std_R**2, phi_std_R**2])
         
         # jacobian
         self.H = np.eye(2)
 
     def predict(self, dt, left_encoder_delta, right_encoder_delta):
         #TODO update self.belief based on right and left encoder data + kinematics
-        if not self.intialized: 
+        if not self.initialized: 
             return
 
         # omega and v of bot (ang velocity and velocity)
         w = (right_encoder_delta - left_encoder_delta)*self.wheel_radius/(self.encoder_resolution*self.baseline*dt)
         v = (right_encoder_delta + left_encoder_delta)*self.wheel_radius/(self.encoder_resolution*2*dt)
 
+        print("v,w:",v,w)
         # distance instantaneous and phi instantaneous
-        d_delta = self.v * dt * np.sin(self.phi)
+        d_delta = v * dt * np.sin(self.belief['mean'][1])
         phi_delta = w * dt
 
         self.belief['mean'] += np.array([d_delta, phi_delta])
@@ -87,10 +89,14 @@ class LaneFilterHistogramKF():
         #TODO update self.belief
         # jacobian
         phi = self.belief['mean'][1]
-        self.F = np.array([[1, v*dt*np.cos(phi)],[0, 1]])
+        F = np.array([[1.0, v*dt*np.cos(phi)],[0.0, 1.0]])
         
         # cov uncertainty
-        self.belief['covariance'] = np.dot(self.F, self.belief['covariance']).dot(self.F.T) + self.Q
+        self.belief['covariance'] = np.dot(F, self.belief['covariance']).dot(F.T) + self.Q
+        print("Predicted v, w:")
+        print("v: {} w: {}".format(v,w))
+        print("Estimated d, phi:",self.belief['mean'])
+        # print("Predict cov:",self.belief['covariance'])
 
     def update(self, segments):
         # prepare the segments for each belief array
@@ -100,24 +106,34 @@ class LaneFilterHistogramKF():
         measurement_likelihood = self.generate_measurement_likelihood(
             segmentsArray)
 
+        if measurement_likelihood is None:
+            return
         # TODO: Parameterize the measurement likelihood as a Gaussian
         maxids = np.unravel_index(
-            self.belief.argmax(), self.belief.shape)
+            measurement_likelihood.argmax(), measurement_likelihood.shape)
         d_max = self.d_min + (maxids[0] + 0.5) * self.delta_d
         phi_max = self.phi_min + (maxids[1] + 0.5) * self.delta_phi
-
+        print("Measured d: {} phi: {}".format(d_max,phi_max))
         # TODO: Apply the update equations for the Kalman Filter to self.belief
         # from extended kalman filter wiki equations
-        y_tilda_k = np.array(d_max,phi_max) - np.array(self.belief['mean'])
-        S_k = np.dot(self.H, self.belief['covariance']).dot(self.H.T) + self.R
-        K = np.dot(self.belief['covariance'], self.H.T).dot(np.inv(S_k))
+        y_tilda_k = np.array([d_max,phi_max]) - self.belief['mean']
+        S_k = self.belief['covariance'] + self.R
+        K = self.belief['covariance'].dot(np.linalg.inv(S_k))
+        print("Innovation:",y_tilda_k)
+        print("Corrected mean step:",np.dot(K, y_tilda_k))
         self.belief['mean'] += np.dot(K, y_tilda_k)
-        self.belief['covariance'] = (np.eye(2) - np.dot(K, self.H)).dot(self.belief['covariance'])
+        self.belief['covariance'] = (np.eye(2) - K).dot(self.belief['covariance'])
+
+        print("Corrected d, phi:",self.belief['mean'])
+        # print("Correct cov:",self.belief['covariance'])
 
     def getEstimate(self):
         return self.belief
 
     def generate_measurement_likelihood(self, segments):
+        
+        if len(segments) == 0:
+            return None
 
         grid = np.mgrid[self.d_min:self.d_max:self.delta_d,
                                     self.phi_min:self.phi_max:self.delta_phi]
