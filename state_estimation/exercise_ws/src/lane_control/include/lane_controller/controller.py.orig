@@ -81,7 +81,9 @@ class LaneController:
         self.prev_phi_err = phi_err
 
         v = self.compute_velocity(stop_line_distance)
-
+        # BHAVYA:
+        if np.abs(omega) > 0.2:
+            v = v/2
         return v, omega
 
     def compute_velocity(self, stop_line_distance):

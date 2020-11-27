@@ -70,7 +70,7 @@ class LaneControllerNode(DTROS):
         self.ao = 0
         
         # The Lookahead distance for Pure Pursuit
-        self.lookahead_dist = 0.5
+        self.lookahead_dist = 0.70
         
         #Length of the dictionary buffer containing of segment points based on their color in a deque.
         self.blength = 150
@@ -202,7 +202,6 @@ class LaneControllerNode(DTROS):
             if len(self.ypm) !=0 and self.pose_msg.phi > 0: 
                 #> self.counting_points(Color.WHITE)
                 #print("YELLOW LINE SEGMENTS: ", len(self.ypm))
-                #self.lookahead_dist = 0.50
                 yellow_centroid = self.calculate_centroid(Color.YELLOW)
                 self.target = yellow_centroid
                 #print("CONDITION 1 RIGHT ")
@@ -210,7 +209,6 @@ class LaneControllerNode(DTROS):
                 self.target[1] -= 0.20 # moving the follow(target) point to the right.
                 #print("CONDITION TRUE")
             elif self.counting_points(Color.WHITE) !=0 and self.pose_msg.phi < 0:
-                #self.lookahead_dist = 0.70
                 white_centroid = self.calculate_centroid(Color.WHITE)
                 self.target = white_centroid
                 #print("CONDITION 2 LEFT")
@@ -236,9 +234,9 @@ class LaneControllerNode(DTROS):
         yell_var,white_var = self.points_y()
         if yell_var > 0.1 or white_var > 0.1:
             #print("INSIDE A TURN")
-            self.max_velocity = 0.28
+            self.max_velocity = 0.45
         else:
-            self.max_velocity = 0.4
+            self.max_velocity = 0.55
         self.yell_y.clear()
         self.white_y.clear()
         #print(self.max_velocity)
