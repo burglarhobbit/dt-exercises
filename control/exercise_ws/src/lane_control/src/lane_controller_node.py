@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-import rospy
+import rospy, os
 
 from duckietown.dtros import DTROS, NodeType, TopicType, DTParam, ParamType
 from duckietown_msgs.msg import Twist2DStamped, LanePose, WheelsCmdStamped, BoolStamped, FSMState, StopLineReading, SegmentList
@@ -65,8 +65,8 @@ class LaneControllerNode(DTROS):
         #                            SegmentList,
         #                            self.cbSegmentLists,
         #                            queue_size=1)
-
-        self.sub_filtered_segment_list = rospy.Subscriber("/agent/lane_filter_node/seglist_filtered",
+        name = f"/{os.environ['VEHICLE_NAME']}/lane_filter_node/seglist_filtered"
+        self.sub_filtered_segment_list = rospy.Subscriber(name,
                                    SegmentList,
                                    self.cbFilteredSegmentLists,
                                    queue_size=1)
