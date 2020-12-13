@@ -46,20 +46,13 @@ class LaneFilterHistogramKF():
             assert p_name in kwargs
             setattr(self, p_name, kwargs[p_name])
 
-<<<<<<< HEAD
-=======
         self.mean_0 = np.array([self.mean_d_0, self.mean_phi_0])
         self.cov_0 = np.array([[self.sigma_d_0, 0], [0, self.sigma_phi_0]])
->>>>>>> b171e32... state estimate: first implementation, not tested
 
 
         self.encoder_resolution = 0
         self.wheel_radius = 0.0
-<<<<<<< HEAD
         self.baseline = 0.0
-=======
-        self.wheel_distance = 0.0 # distance between two wheels
->>>>>>> b171e32... state estimate: first implementation, not tested
         self.initialized = False
         self.reset()
 
