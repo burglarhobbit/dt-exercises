@@ -14,7 +14,7 @@ from cv_bridge import CvBridge
 class ObjectDetectionNode(DTROS):
 
     def __init__(self, node_name):
-
+        self.initialized = False
         # Initialize the DTROS parent class
         super(ObjectDetectionNode, self).__init__(
             node_name=node_name,
@@ -74,7 +74,7 @@ class ObjectDetectionNode(DTROS):
 
         # Decode from compressed image with OpenCV
         try:
-            image = self.bridge.compressed_imgmsg_to_cv2(image_msg)
+            image = self.bridge.compressed_imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
         except ValueError as e:
             self.logerr('Could not decode image: %s' % e)
             return
@@ -87,8 +87,8 @@ class ObjectDetectionNode(DTROS):
                 image
             )
         
-        image = cv2.resize(image, (224,224))
-        bboxes, classes, scores = self.model_wrapper.predict(image)
+        # image = cv2.resize(image, (224,224))
+        bboxes, classes, scores = self.model_wrapper.predict([image])
         
         msg = BoolStamped()
         msg.header = image_msg.header
