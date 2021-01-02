@@ -124,7 +124,8 @@ class ObjectDetectionNode(DTROS):
             area = (x2-x1) * (y2-y1)
 
             if self.model_wrapper.on_bot:
-                if area > 720 and x2 < lim_x2 and x1 > lim_x1:
+                if area > 2900 and x2 < lim_x2 and x1 > lim_x1:
+                    print(f"Returning True for {area}")
                     return True
             else:
                 if area > 22000 and x2 < lim_x2 and x1 > lim_x1:
