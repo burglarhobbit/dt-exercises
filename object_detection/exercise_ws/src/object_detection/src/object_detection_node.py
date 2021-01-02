@@ -92,17 +92,18 @@ class ObjectDetectionNode(DTROS):
         
         msg = BoolStamped()
         msg.header = image_msg.header
-        msg.data = self.det2bool(bboxes[0], classes[0]) # [0] because our batch size given to the wrapper is 1
+        # msg.data = self.det2bool(bboxes[0], classes[0]) # [0] because our batch size given to the wrapper is 1
+        msg.data = self.det2bool(bboxes, classes) # [0] because our batch size given to the wrapper is 1
         
         self.pub_obj_dets.publish(msg)
     
     def det2bool(self, bboxes, classes):
         # TODO remove these debugging prints
-        print(bboxes)
-        print(classes)
+        # print(bboxes)
+        # print(classes)
         
         # This is a dummy solution, remove this next line
-        return len(bboxes) > 1
+        # return len(bboxes) > 1
     
         
         # TODO filter the predictions: the environment here is a bit different versus the data collection environment, and your model might output a bit
@@ -112,16 +113,27 @@ class ObjectDetectionNode(DTROS):
         # TODO also filter detections which are outside of the road, or too far away from the bot. Only return True when there's a pedestrian (aka a duckie)
         # in front of the bot, which you know the bot will have to avoid. A good heuristic would be "if centroid of bounding box is in the center of the image, 
         # assume duckie is in the road" and "if bouding box's area is more than X pixels, assume duckie is close to us"
-        
+        x_patch = 640*0.7
+        lim_x2 = 640//2 + x_patch//2
+        lim_x1 = 640//2 - x_patch//2        
         
         obj_det_list = []
         for i in range(len(bboxes)):
             x1, y1, x2, y2 = bboxes[i]
             label = classes[i]
-            
+            area = (x2-x1) * (y2-y1)
+
+            if self.model_wrapper.on_bot:
+                if area > 720 and x2 < lim_x2 and x1 > lim_x1:
+                    return True
+            else:
+                if area > 22000 and x2 < lim_x2 and x1 > lim_x1:
+                    return True
+            print(area, bboxes[i]) 
             # TODO if label isn't a duckie, skip
             # TODO if detection is a pedestrian in front of us:
-            #   return True
+        
+        return False
 
 
 

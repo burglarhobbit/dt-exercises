@@ -17,7 +17,17 @@ class Wrapper():
         # TODO Instantiate your model and other class instances here!
         # TODO Don't forget to set your model in evaluation/testing/production mode, and sending it to the GPU
         # TODO If no GPU is available, raise the NoGPUAvailable exception
-        self.model = Model("/code/exercise_ws/src/object_detection/include/object_detection/yolov5/models/yolov5s.yaml", ch=3, nc=4)
+        if model_file.split("_")[-1] == "sim.pt":
+            nc = 4
+            self.duckie_class = 0
+            self.on_bot = False
+        elif model_file.split("_")[-1] == "real.pt":
+            nc = 3
+            self.duckie_class = 1
+            self.on_bot = True
+        else:
+            raise Exception("weights file name issue in config")
+        self.model = Model("/code/exercise_ws/src/object_detection/include/object_detection/yolov5/models/yolov5s.yaml", ch=3, nc=nc)
         self.model.load_state_dict(torch.load(model_file))
         self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names
 
@@ -72,23 +82,23 @@ class Wrapper():
             # Inference
             pred = self.model(img, augment=False)[0]
 
-            print(pred)
+            # print(pred)
             # Apply NMS
-            pred = non_max_suppression(pred, 0.25, 0.45, classes=0, agnostic=False)
+            pred = non_max_suppression(pred, 0.25, 0.45, classes=self.duckie_class, agnostic=False)
             # print(pred)
             for i, det in enumerate(pred):  # detections per image
                 if len(det):
-                    print(img.shape,im0s.shape)
+                    # print(img.shape,im0s.shape)
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
 
                     # Print results
                     # for c in det[:, -1].unique():
                     #     n = (det[:, -1] == c).sum()  # detections per class
                         # s += f'{n} {self.names[int(c)]}s, '  # add to string
-                    print(det)
+                    # print(det)
                     # Write results
                     for *xyxy, conf, cls in reversed(det):
-                        print(xyxy,cls)
+                        # print(xyxy,cls)
                         # label = f'{names[int(cls)]} {conf:.2f}'
                         # plot_one_box(xyxy, im0, color=colors[int(cls)], line_thickness=3)
                         # plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)            
@@ -99,7 +109,7 @@ class Wrapper():
                         labels.append(self.names[int(cls)])
                         scores.append(conf)
             plot_img = self.draw_boxes(im0s, boxes)
-            Image.fromarray(plot_img).save("/code/img_bbox.png")
+            Image.fromarray(plot_img[:,:,::-1]).save("/code/img_bbox.png")
 
         return boxes, labels, scores
 
