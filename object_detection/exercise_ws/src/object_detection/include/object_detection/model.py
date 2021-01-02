@@ -2,6 +2,7 @@
 from .yolov5.models.yolo import Model
 import torch
 <<<<<<< HEAD
+<<<<<<< HEAD
 import numpy as np
 from .yolov5.utils.general import check_img_size, non_max_suppression, scale_coords
 from PIL import Image, ImageDraw
@@ -13,6 +14,11 @@ from .yolov5.utils.general import check_img_size, non_max_suppression, scale_coo
 from PIL import Image, ImageDraw
 >>>>>>> 3ef46837... exercise 3 duckietown working object detection
 >>>>>>> 5fca5720... merge fix
+=======
+import numpy as np
+from .yolov5.utils.general import check_img_size, non_max_suppression, scale_coords
+from PIL import Image, ImageDraw
+>>>>>>> 58a1c417... merge fix
 
 class NoGPUAvailable(Exception):
     def __init__(self):
@@ -20,6 +26,7 @@ class NoGPUAvailable(Exception):
 
 class Wrapper():
     def __init__(self, model_file):
+<<<<<<< HEAD
 <<<<<<< HEAD
         # if not torch.cuda.is_available():
         #     raise NoGPUAvailable()
@@ -32,10 +39,15 @@ class Wrapper():
         #     raise NoGPUAvailable()
 >>>>>>> 3ef46837... exercise 3 duckietown working object detection
 >>>>>>> 5fca5720... merge fix
+=======
+        # if not torch.cuda.is_available():
+        #     raise NoGPUAvailable()
+>>>>>>> 58a1c417... merge fix
 
         # TODO Instantiate your model and other class instances here!
         # TODO Don't forget to set your model in evaluation/testing/production mode, and sending it to the GPU
         # TODO If no GPU is available, raise the NoGPUAvailable exception
+<<<<<<< HEAD
 <<<<<<< HEAD
         self.model = Model("/code/exercise_ws/src/object_detection/include/object_detection/yolov5/models/yolov5s.yaml", ch=3, nc=4)
 =======
@@ -48,6 +60,8 @@ class Wrapper():
 <<<<<<< HEAD
 =======
 =======
+=======
+>>>>>>> 58a1c417... merge fix
         self.model = Model("/code/exercise_ws/src/object_detection/include/object_detection/yolov5/models/yolov5s.yaml", ch=3, nc=4)
         self.model.load_state_dict(torch.load(model_file))
         self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names
@@ -63,9 +77,12 @@ class Wrapper():
         # img.show()
         return np.array(img)
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 3ef46837... exercise 3 duckietown working object detection
 >>>>>>> 5fca5720... merge fix
+=======
+>>>>>>> 58a1c417... merge fix
     def predict(self, batch_or_image):
 
         # TODO Make your model predict here!
@@ -91,6 +108,7 @@ class Wrapper():
             # img = letterbox(im0s, new_shape=self.img_size)[0]
 
             # Convert
+<<<<<<< HEAD
 <<<<<<< HEAD
             Image.fromarray(im0s).save("/code/img.png")
 
@@ -138,6 +156,8 @@ class Wrapper():
                 labels.append(names[int(cls)])
                 scores.append(conf)
 =======
+=======
+>>>>>>> 58a1c417... merge fix
             Image.fromarray(im0s).save("/code/img.png")
 
             img = im0s[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
@@ -185,9 +205,12 @@ class Wrapper():
             plot_img = self.draw_boxes(im0s, boxes)
             Image.fromarray(plot_img).save("/code/img_bbox.png")
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 3ef46837... exercise 3 duckietown working object detection
 >>>>>>> 5fca5720... merge fix
+=======
+>>>>>>> 58a1c417... merge fix
 
         return boxes, labels, scores
 
@@ -197,15 +220,21 @@ class Wrapper():
 #         pass
 #     # TODO add your own functions if need be!
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 =======
 >>>>>>> 5fca5720... merge fix
+=======
+>>>>>>> 58a1c417... merge fix
 
 if __name__ == "__main__":
     model_wrapper = Wrapper("yolov5/models/yolov5s.yaml")
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 3ef46837... exercise 3 duckietown working object detection
 >>>>>>> 5fca5720... merge fix
+=======
+>>>>>>> 58a1c417... merge fix
